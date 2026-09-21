@@ -1,0 +1,76 @@
+{
+  "description": "Evaluation set for the Emirates NBD annual report. Each question declares the retrieval strategy it should route to and the facts a correct answer must contain. 'expected_keywords' are scored case-insensitively; 'expected_triples' are matched loosely on source/relation/target substrings.",
+  "questions": [
+    {
+      "id": "ownership-emirates-islamic",
+      "question": "Who owns Emirates Islamic?",
+      "expected_strategy": ["graph", "hybrid"],
+      "expected_keywords": ["Emirates NBD", "Emirates Islamic"],
+      "expected_triples": [
+        {"source": "Emirates NBD", "relation": "OWNS", "target": "Emirates Islamic"}
+      ],
+      "category": "corporate_structure"
+    },
+    {
+      "id": "acquisition-rbl",
+      "question": "What stake did Emirates NBD agree to acquire in India?",
+      "expected_strategy": ["hybrid", "graph"],
+      "expected_keywords": ["RBL Bank"],
+      "expected_triples": [
+        {"source": "Emirates NBD", "relation": "", "target": "RBL Bank"}
+      ],
+      "category": "international_expansion"
+    },
+    {
+      "id": "subsidiaries",
+      "question": "Which banks does Emirates NBD own?",
+      "expected_strategy": ["graph", "hybrid"],
+      "expected_keywords": ["Emirates Islamic"],
+      "expected_triples": [
+        {"source": "Emirates NBD", "relation": "OWNS", "target": ""}
+      ],
+      "category": "corporate_structure"
+    },
+    {
+      "id": "business-segments",
+      "question": "What business segments does Emirates NBD operate?",
+      "expected_strategy": ["graph", "hybrid"],
+      "expected_keywords": ["Retail Banking"],
+      "expected_triples": [],
+      "category": "business_segments"
+    },
+    {
+      "id": "financial-performance",
+      "question": "What profit did Emirates NBD report?",
+      "expected_strategy": ["hybrid", "vector"],
+      "expected_keywords": ["AED"],
+      "expected_triples": [],
+      "category": "financial_performance"
+    },
+    {
+      "id": "strategy-narrative",
+      "question": "Summarise the group's strategic priorities and outlook.",
+      "expected_strategy": ["vector", "hybrid"],
+      "expected_keywords": [],
+      "expected_triples": [],
+      "category": "strategy"
+    },
+    {
+      "id": "technology-investment",
+      "question": "How is Emirates NBD investing in technology and AI?",
+      "expected_strategy": ["hybrid", "vector"],
+      "expected_keywords": [],
+      "expected_triples": [],
+      "category": "technology"
+    },
+    {
+      "id": "unanswerable",
+      "question": "What is the current share price of Tesla?",
+      "expected_strategy": ["vector", "hybrid", "graph"],
+      "expected_keywords": [],
+      "expected_triples": [],
+      "must_refuse": true,
+      "category": "out_of_scope"
+    }
+  ]
+}

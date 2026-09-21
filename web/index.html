@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GraphRAG — Strategic Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/styles.css">
+<script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/dist/vis-network.min.js" defer></script>
+</head>
+<body>
+
+<!-- Status bar: what the system currently knows, and nothing else. -->
+<header class="bar">
+  <div class="bar__mark">
+    <span class="bar__glyph" aria-hidden="true"></span>
+    <span class="bar__name">GraphRAG</span>
+  </div>
+  <div class="bar__doc" id="doc-name">no document indexed</div>
+</header>
+
+<!-- Upload progress. Hidden until a document is actually being ingested. -->
+<div class="ingest" id="ingest" hidden>
+  <div class="ingest__track"><div class="ingest__fill" id="ingest-fill"></div></div>
+  <p class="ingest__label" id="ingest-label">Preparing…</p>
+  <button class="ingest__close" id="ingest-close" type="button" aria-label="Dismiss">×</button>
+</div>
+
+<main class="thread" id="thread">
+  <!-- Empty state. Replaced by the conversation on first question. -->
+  <section class="opening" id="opening">
+    <h1 class="opening__title">Ask the report</h1>
+    <p class="opening__body">
+      Answers are built from the document and cite the page they came from.
+    </p>
+    <ul class="starters" id="starters">
+      <li><button type="button" data-q="Who owns Emirates Islamic?">Who owns Emirates Islamic?</button></li>
+      <li><button type="button" data-q="What profit did Emirates NBD report?">What profit did Emirates NBD report?</button></li>
+      <li><button type="button" data-q="Which business segments does the group operate?">Which business segments does the group operate?</button></li>
+    </ul>
+  </section>
+</main>
+
+<!-- Composer. The only controls are: add a document, and ask. -->
+<form class="composer" id="composer">
+  <label class="composer__attach" title="Add a PDF to the index">
+    <input type="file" id="file" accept="application/pdf" hidden>
+    <svg viewBox="0 0 20 20" width="19" height="19" aria-hidden="true">
+      <path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+    </svg>
+    <span class="sr-only">Add a PDF</span>
+  </label>
+  <textarea id="input" rows="1" placeholder="Ask about the strategic report…"
+            autocomplete="off" spellcheck="false"></textarea>
+  <button class="composer__send" id="send" type="submit" disabled>Ask</button>
+</form>
+
+<script src="/static/app.js" defer></script>
+</body>
+</html>

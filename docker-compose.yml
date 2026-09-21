@@ -1,0 +1,96 @@
+# =============================================================================
+# GraphRAG stack
+#
+#   docker compose up -d neo4j          -> just the graph DB (recommended for dev;
+#                                          run the app natively for hot reload)
+#   docker compose --profile app up -d  -> the application (UI included at :8000)
+#
+# Credentials come from .env (NEO4J_USERNAME / NEO4J_PASSWORD), so the database,
+# the API and the UI are all guaranteed to agree on one set of secrets.
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Neo4j 5 — stores the entity/relationship graph extracted from the report.
+  # ---------------------------------------------------------------------------
+  neo4j:
+    # Opt-in: `docker compose --profile local-db up -d neo4j`.
+    # Skip it entirely when NEO4J_URI points at Neo4j Aura (the default here).
+    profiles: ["local-db"]
+    image: neo4j:5.26-community
+    container_name: graphrag-neo4j
+    restart: unless-stopped
+    ports:
+      - "7474:7474"   # HTTP — Neo4j Browser UI at http://localhost:7474
+      - "7687:7687"   # Bolt — the port the Python driver connects on
+    environment:
+      # NEO4J_AUTH takes the literal form "user/password".
+      NEO4J_AUTH: ${NEO4J_USERNAME:-neo4j}/${NEO4J_PASSWORD:-please_change_me}
+      # APOC is bundled in the image; enabling it gives richer path procedures.
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_apoc_export_file_enabled: "true"
+      NEO4J_apoc_import_file_enabled: "true"
+      # Memory sizing kept small on purpose: Docker Desktop's Linux VM is often
+      # capped around 4GB, and heap + pagecache + JVM overhead above that gets
+      # the container OOM-killed (exit 137) during startup. These values are
+      # ample for a single annual report's graph.
+      NEO4J_server_memory_heap_initial__size: 512m
+      NEO4J_server_memory_heap_max__size: 1G
+      NEO4J_server_memory_pagecache_size: 384m
+    volumes:
+      - neo4j_data:/data           # graph itself — survives container recreation
+      - neo4j_logs:/logs
+      - neo4j_plugins:/plugins
+    healthcheck:
+      # Nothing downstream should start until Bolt actually answers queries.
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # FastAPI — the whole application: ingestion, retrieval, SSE chat, and the
+  # web client at /. One service, one origin, no separate UI container.
+  # ---------------------------------------------------------------------------
+  api:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: graphrag-api
+    restart: unless-stopped
+    command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    environment:
+      # Follows .env. Falls back to the compose service name, which is correct
+      # only when the local-db profile is running.
+      NEO4J_URI: ${NEO4J_URI:-bolt://neo4j:7687}
+      NEO4J_USERNAME: ${NEO4J_USERNAME:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-qwen/qwen3.8-27b:free}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
+      HF_HOME: /home/appuser/.cache/huggingface
+    volumes:
+      - ./data:/app/data             # FAISS index + parent store persist on the host
+      - "./Company Docs:/app/Company Docs:ro"     # source PDFs, read-only
+      - hf_cache:/home/appuser/.cache/huggingface  # avoid re-downloading the embedder
+    # No depends_on: the database may be Aura (external) rather than the
+    # optional local-db container.
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import httpx,sys; sys.exit(0 if httpx.get('http://localhost:8000/health',timeout=5).status_code==200 else 1)\""]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 90s   # generous: first boot downloads the embedding model
+
+# -----------------------------------------------------------------------------
+# Named volumes — managed by Docker, never committed to git.
+# -----------------------------------------------------------------------------
+volumes:
+  neo4j_data:
+  neo4j_logs:
+  neo4j_plugins:
+  hf_cache:

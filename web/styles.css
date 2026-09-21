@@ -1,0 +1,503 @@
+/* ==========================================================================
+   GraphRAG — Strategic Report
+
+   Two materials, one idea. Answers are serif prose set on paper; the
+   knowledge graph is a dark inset cut into that paper. The contrast is the
+   design, and it mirrors the architecture: text retrieval and graph
+   retrieval are different things and should not look alike.
+
+   Colour carries meaning rather than decoration:
+     indigo = evidence from the vector index (passages)
+     teal   = evidence from the knowledge graph (relationships)
+   Nothing else in the interface is coloured.
+   ========================================================================== */
+
+:root {
+  /* Ground */
+  --paper:      #F7F8FA;   /* cool paper, deliberately not a warm cream */
+  --paper-deep: #EDEFF3;
+  --well:       #0B1F33;   /* the dark inset: a real navy, not a tinted black */
+  --well-deep:  #071624;
+
+  /* Ink */
+  --ink:        #0A0F16;
+  --ink-soft:   #3D4652;
+  --ink-faint:  #6B7480;
+  --rule:       #DDE2E9;
+  --rule-soft:  #E9ECF1;
+
+  /* Provenance */
+  --vector:     #3B4FA8;   /* passages */
+  --vector-bg:  #EDEFFA;
+  --graph:      #0E7C6B;   /* relationships */
+  --graph-bg:   #E6F4F1;
+
+  /* Type scale — Elements of Typographic Style, 1.2 ratio off 16px */
+  --t-xs:  0.75rem;
+  --t-sm:  0.8125rem;
+  --t-base: 0.9375rem;
+  --t-md:  1.0625rem;
+  --t-lg:  1.375rem;
+  --t-xl:  2.25rem;
+
+  --measure: 68ch;
+  --gutter: 24px;
+  --bar-h: 52px;
+  --composer-h: 76px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  font-size: var(--t-base);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  overflow: hidden;
+}
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--vector);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* ── Status bar ─────────────────────────────────────────────────────────── */
+
+.bar {
+  height: var(--bar-h);
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 var(--gutter);
+  border-bottom: 1px solid var(--rule);
+  background: var(--paper);
+}
+
+.bar__mark { display: flex; align-items: center; gap: 9px; }
+
+/* Two dots joined by a line: the smallest possible drawing of a relationship. */
+.bar__glyph {
+  width: 22px; height: 10px;
+  background:
+    radial-gradient(circle 4px at 4px 5px, var(--vector) 98%, transparent) no-repeat,
+    radial-gradient(circle 4px at 18px 5px, var(--graph) 98%, transparent) no-repeat,
+    linear-gradient(var(--ink-faint), var(--ink-faint)) no-repeat;
+  background-size: 100% 100%, 100% 100%, 10px 1.5px;
+  background-position: 0 0, 0 0, 6px 4.2px;
+}
+
+.bar__name { font-weight: 600; letter-spacing: -0.01em; }
+
+.bar__doc {
+  flex: 1;
+  min-width: 0;
+  color: var(--ink-soft);
+  font-size: var(--t-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+
+/* ── Ingestion strip ────────────────────────────────────────────────────── */
+
+.ingest {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 9px var(--gutter);
+  background: var(--vector-bg);
+  border-bottom: 1px solid var(--rule);
+}
+.ingest[hidden] { display: none; }
+
+.ingest__track {
+  flex: 1;
+  height: 3px;
+  background: #fff;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.ingest__fill {
+  height: 100%;
+  width: 0;
+  background: var(--vector);
+  transition: width .4s ease;
+}
+.ingest__label {
+  margin: 0;
+  font-size: var(--t-sm);
+  color: var(--vector);
+  white-space: nowrap;
+}
+.ingest.is-done   { background: var(--graph-bg); }
+.ingest.is-done   .ingest__label { color: var(--graph); }
+.ingest.is-done   .ingest__fill  { background: var(--graph); }
+.ingest.is-failed { background: #FBECEC; }
+.ingest.is-failed .ingest__label { color: #A32C2C; }
+.ingest.is-failed .ingest__fill  { background: #A32C2C; }
+
+.ingest__close {
+  border: 0; background: none; cursor: pointer;
+  font-size: 19px; line-height: 1;
+  color: currentColor; opacity: .5; padding: 0 2px;
+}
+.ingest__close:hover { opacity: 1; }
+
+/* ── Thread ─────────────────────────────────────────────────────────────── */
+
+.thread {
+  overflow-y: auto;
+  padding: 40px var(--gutter) 28px;
+  scroll-behavior: smooth;
+}
+@media (prefers-reduced-motion: reduce) {
+  .thread { scroll-behavior: auto; }
+}
+
+.thread__inner { max-width: var(--measure); margin: 0 auto; }
+
+/* ── Opening ────────────────────────────────────────────────────────────── */
+
+.opening { max-width: var(--measure); margin: 6vh auto 0; }
+
+.opening__title {
+  font-family: "IBM Plex Serif", Georgia, serif;
+  font-size: var(--t-xl);
+  font-weight: 400;
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+  margin: 0 0 18px;
+}
+.opening__title em { font-style: italic; color: var(--ink-soft); }
+
+.opening__body {
+  max-width: 54ch;
+  color: var(--ink-soft);
+  margin: 0 0 32px;
+}
+
+.starters { list-style: none; padding: 0; margin: 0; display: grid; gap: 1px; background: var(--rule); border-block: 1px solid var(--rule); }
+.starters button {
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: var(--paper);
+  padding: 13px 2px;
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+}
+.starters button:hover { background: var(--paper-deep); }
+
+/* ── Turns ──────────────────────────────────────────────────────────────── */
+
+.turn { max-width: var(--measure); margin: 0 auto 40px; }
+
+.turn__question {
+  font-family: "IBM Plex Serif", Georgia, serif;
+  font-size: var(--t-md);
+  font-weight: 600;
+  margin: 0 0 20px;
+  padding-left: 14px;
+  border-left: 2px solid var(--ink);
+}
+
+
+/* The answer itself: serif, because it is prose from a document. */
+.answer {
+  font-family: "IBM Plex Serif", Georgia, serif;
+  font-size: var(--t-md);
+  line-height: 1.68;
+  color: var(--ink);
+}
+.answer p { margin: 0 0 0.9em; }
+.answer ul, .answer ol { margin: 0 0 0.9em; padding-left: 1.3em; }
+.answer li { margin-bottom: .3em; }
+.answer strong { font-weight: 600; }
+.answer code {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: .88em;
+  background: var(--paper-deep);
+  padding: 1px 4px;
+}
+
+/* Citation markers carry their page number, so a claim can be placed in the
+   document without opening anything. Clicking still jumps to the passage. */
+.cite {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: .62em;
+  font-weight: 600;
+  vertical-align: super;
+  color: var(--vector);
+  background: var(--vector-bg);
+  border: 0;
+  padding: 2px 5px;
+  margin: 0 1px;
+  cursor: pointer;
+  line-height: 1;
+  white-space: nowrap;
+}
+.cite:hover { background: var(--vector); color: #fff; }
+.cite__page {
+  font-weight: 400;
+  opacity: .72;
+  font-variant-numeric: tabular-nums;
+}
+
+.caret {
+  display: inline-block;
+  width: 2px; height: 1.05em;
+  background: var(--ink);
+  vertical-align: text-bottom;
+  animation: blink 1s steps(2) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .caret { animation: none; } }
+
+
+/* ── Sources ────────────────────────────────────────────────────────────── */
+
+/* A quiet status line while retrieval runs. Removed on the first token, so
+   it never competes with the answer for attention. */
+.status {
+  font-size: var(--t-sm);
+  color: var(--ink-faint);
+  margin: 0 0 14px;
+}
+
+.sources { margin-top: 28px; border-top: 1px solid var(--rule); padding-top: 4px; }
+
+.sources__label {
+  font-size: var(--t-sm);
+  color: var(--ink-faint);
+  margin: 8px 0 2px;
+}
+
+
+
+/* Passages: numbered to match the [n] markers in the answer. */
+.passage { border-bottom: 1px solid var(--rule-soft); }
+.passage.is-flash { background: var(--vector-bg); }
+
+.passage__head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  width: 100%;
+  border: 0;
+  background: none;
+  padding: 12px 0;
+  font: inherit;
+  font-size: var(--t-sm);
+  text-align: left;
+  cursor: pointer;
+  color: var(--ink-soft);
+}
+.passage__n {
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 500;
+  color: var(--vector);
+  min-width: 1.4em;
+}
+/* Page first: it is the single most useful thing about a retrieved passage. */
+.passage__page {
+  color: var(--ink);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.passage__where {
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 40ch;
+}
+
+.passage__body {
+  padding: 0 0 16px 2.2em;
+  font-family: "IBM Plex Serif", Georgia, serif;
+  color: var(--ink);
+  white-space: pre-wrap;
+  max-height: 340px;
+  overflow-y: auto;
+}
+.passage__body[hidden] { display: none; }
+.passage__open { margin: 14px 0 0; }
+
+.pdflink {
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: var(--t-sm);
+  color: var(--vector);
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
+  padding-bottom: 1px;
+}
+.pdflink:hover { color: var(--ink); }
+
+/* Relationships: subject, verb, object — read as a sentence, not a table. */
+.triple {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 7px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule-soft);
+  font-size: var(--t-sm);
+}
+.triple__node { font-weight: 500; }
+.triple__rel {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: var(--t-xs);
+  color: var(--graph);
+  background: var(--graph-bg);
+  padding: 2px 6px;
+}
+.triple__hop {
+  margin-left: auto;
+  font-size: var(--t-xs);
+  color: var(--ink-faint);
+}
+.triple__evidence {
+  flex-basis: 100%;
+  font-family: "IBM Plex Serif", Georgia, serif;
+  font-style: italic;
+  color: var(--ink-faint);
+  font-size: var(--t-sm);
+}
+
+/* ── The graph well: the one bold element on the page ───────────────────── */
+
+.well {
+  background: var(--well);
+  background-image: radial-gradient(ellipse at 50% 0%, var(--well) 0%, var(--well-deep) 100%);
+  height: 380px;
+  position: relative;
+  margin-bottom: 14px;
+}
+.well__canvas { position: absolute; inset: 0; }
+.well__note {
+  position: absolute;
+  left: 14px; bottom: 11px;
+  font-size: var(--t-xs);
+  color: rgba(255,255,255,.42);
+  pointer-events: none;
+}
+
+/* ── Composer ───────────────────────────────────────────────────────────── */
+
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 14px var(--gutter);
+  border-top: 1px solid var(--rule);
+  background: var(--paper);
+}
+
+.composer__attach {
+  display: grid;
+  place-items: center;
+  width: 38px; height: 38px;
+  border: 1px solid var(--rule);
+  color: var(--ink-soft);
+  cursor: pointer;
+  flex: none;
+}
+.composer__attach:hover { border-color: var(--ink-soft); color: var(--ink); }
+
+.composer textarea {
+  flex: 1;
+  resize: none;
+  border: 1px solid var(--rule);
+  background: #fff;
+  padding: 9px 12px;
+  font: inherit;
+  color: var(--ink);
+  max-height: 160px;
+  line-height: 1.5;
+}
+.composer textarea:focus { outline: none; border-color: var(--ink-soft); }
+.composer textarea::placeholder { color: var(--ink-faint); }
+
+.composer__send {
+  flex: none;
+  height: 38px;
+  padding: 0 20px;
+  border: 0;
+  background: var(--ink);
+  color: var(--paper);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.composer__send:disabled { background: var(--rule); color: var(--ink-faint); cursor: not-allowed; }
+.composer__send:not(:disabled):hover { background: var(--vector); }
+
+/* ── Narrow screens ─────────────────────────────────────────────────────── */
+
+@media (max-width: 680px) {
+  :root { --gutter: 16px; --t-xl: 1.75rem; }
+    .bar__doc { font-size: var(--t-xs); }
+  .well { height: 300px; }
+  .opening { margin-top: 3vh; }
+}
+
+
+/* A chevron that turns when the passage opens: the only motion here, and it
+   answers a click rather than announcing itself. */
+.passage__chev {
+  margin-left: auto;
+  width: 7px; height: 7px;
+  border-right: 1.5px solid var(--ink-faint);
+  border-bottom: 1.5px solid var(--ink-faint);
+  transform: rotate(45deg) translate(-2px, -2px);
+  transition: transform .18s ease;
+}
+.passage__head[aria-expanded="true"] .passage__chev {
+  transform: rotate(-135deg) translate(-2px, -2px);
+}
+@media (prefers-reduced-motion: reduce) { .passage__chev { transition: none; } }
+
+/* The graph, folded away. Most answers are read without opening it. */
+.graphfold { margin-top: 16px; }
+.graphfold summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--t-sm);
+  color: var(--graph);
+  padding: 9px 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.graphfold summary::-webkit-details-marker { display: none; }
+.graphfold summary::before {
+  content: "";
+  width: 6px; height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+}
+.graphfold[open] summary::before { transform: rotate(45deg); }
+.graphfold summary span { color: var(--ink-faint); font-size: var(--t-xs); }
+.graphfold .well { margin-top: 4px; }
