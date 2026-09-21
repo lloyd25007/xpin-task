@@ -2,6 +2,10 @@
 
 A retrieval-augmented chatbot over a bank's strategic report that answers from **two** retrieval paths: dense vector search over hierarchically chunked text, and N-hop traversal of a Neo4j knowledge graph of typed entity relationships — so questions like *"who owns Emirates Islamic?"* are answered from a `SUBSIDIARY_OF` edge rather than from whichever paragraph happens to share the most vocabulary with the question.
 
+**Plug and play.** The vector index and the knowledge graph both ship with the
+repository — the index is committed under `data/`, and the graph loads itself
+into Neo4j on first startup. Clone, fill in `.env`, run, and ask a question.
+
 ---
 
 ## Architecture
@@ -216,21 +220,28 @@ python scripts/load_cypher.py emirates_nbd_graph.cypher --wipe
 The automatic load only ever runs at zero entities, so it cannot overwrite an
 existing graph. Disable it with `GRAPH_BOOTSTRAP=false`.
 
-### 5. Ingest the PDF (builds the vector index)
+### 5. Ingest the PDF — optional
+
+A pre-built vector index is committed (`data/faiss_index/`, `data/parents/`),
+so retrieval works immediately after a clone. Skip to step 6 unless the
+document or the embedding model changes.
+
+To rebuild, or to ingest a different document:
 
 ```bash
 python scripts/ingest_cli.py --reset
+python scripts/ingest_cli.py --max-pages 20                        # quick smoke test
+python scripts/ingest_cli.py --no-graph                            # vectors only, no LLM calls
+python scripts/ingest_cli.py --path "Company Docs/other.pdf" --doc-id other
 ```
 
-Useful variants:
+`--no-graph` skips LLM extraction entirely. Combined with the graph bootstrap in
+step 4, the whole system runs with **zero LLM calls at ingestion time**.
 
-```bash
-python scripts/ingest_cli.py --max-pages 20          # quick smoke test
-python scripts/ingest_cli.py --no-graph              # vectors only, no LLM calls
-python scripts/ingest_cli.py --path Company/other.pdf --doc-id other
-```
-
-`--no-graph` skips LLM extraction entirely. Combined with step 4, the whole system runs with **zero LLM calls at ingestion time**.
+> A FAISS index is tied to the embedding model that built it. The committed one
+> is `all-MiniLM-L6-v2`. If `EMBEDDING_MODEL` changes, re-run with `--reset` —
+> otherwise query and stored vectors come from different models and retrieval
+> silently degrades.
 
 ### 6. Run
 

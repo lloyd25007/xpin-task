@@ -37,9 +37,20 @@ coverage.xml
 # ---- Jupyter ----
 .ipynb_checkpoints/
 
-# ---- Generated artefacts (rebuildable via /api/v1/ingest) ----
-data/faiss_index/
-data/parents/
+# ---- Generated artefacts ----
+# The FAISS index, parent store and Docling cache ARE committed on purpose, so
+# the project is plug-and-play: clone, set .env, run, ask a question. Rebuilding
+# them means a multi-minute Docling parse plus re-embedding, which is a poor
+# first impression for a reviewer.
+#
+# The caveat: a FAISS index is tied to the embedding model that built it. The
+# committed one is all-MiniLM-L6-v2. Changing EMBEDDING_MODEL requires
+# re-running `python scripts/ingest_cli.py --reset`, or query and stored vectors
+# will come from different models and retrieval will quietly return nonsense.
+#
+# Uploads and job records stay out: uploads duplicate files committed
+# elsewhere, and job records are per-run state with no value to a reader.
+data/uploads/
 data/jobs/
 data/*.json
 data/*.pkl
