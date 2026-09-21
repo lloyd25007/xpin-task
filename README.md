@@ -37,7 +37,7 @@ A retrieval-augmented chatbot over a bank's strategic report that answers from *
           │                     ▲
           ▼                     │
     ┌──────────────┐            │        emirates_nbd_graph.cypher
-    │    Neo4j     │◀───────────┼──────── (hand-authored, no LLM)
+    │    Neo4j     │◀───────────┼──────── 
     │ typed edges  │            │
     │ + provenance │            │
     └──────────────┘            │
@@ -154,7 +154,7 @@ An API key for **at least one** of: Requesty, OpenRouter, or OpenAI. Embeddings 
 │   ├── integration/       # Requires a populated index and Neo4j
 │   ├── evaluation/        # RAG quality metrics (opt-in)
 │   └── fixtures/          # Labelled evaluation questions
-├── Company Docs/            # Source PDFs (set by DOCS_DIR)
+├── Company/               # Source PDFs
 ├── data/                  # Generated: FAISS index, parents.json (gitignored)
 ├── emirates_nbd_graph.cypher   # Hand-authored knowledge graph
 ├── docker-compose.yml     # Optional local Neo4j; optional containerised app
@@ -224,7 +224,7 @@ Useful variants:
 ```bash
 python scripts/ingest_cli.py --max-pages 20          # quick smoke test
 python scripts/ingest_cli.py --no-graph              # vectors only, no LLM calls
-python scripts/ingest_cli.py --path "Company Docs/other.pdf" --doc-id other
+python scripts/ingest_cli.py --path Company/other.pdf --doc-id other
 ```
 
 `--no-graph` skips LLM extraction entirely. Combined with step 4, the whole system runs with **zero LLM calls at ingestion time**.
@@ -275,8 +275,7 @@ docker compose --profile app up -d --build
 | `RRF_VECTOR_WEIGHT` / `RRF_GRAPH_WEIGHT` | Retriever influence | `1.0` / `0.8` |
 | `EXTRACTION_WORKERS` | Concurrent extraction calls | `8` |
 | `EXTRACTION_RPM` | Request pacing; `0` disables | `30` |
-| `DOCS_DIR` | Source-document directory | `Company Docs` |
-| `DEFAULT_PDF_PATH` | Document ingested by default | `Company Docs/strategic_report_2025_emirates_nbd.pdf` |
+| `DEFAULT_PDF_PATH` | Document ingested by default | `Company/strategic_report_2025_emirates_nbd.pdf` |
 
 > `.env` takes precedence over OS environment variables. This is deliberate: `docker compose` exports these names into the shell, which otherwise silently shadows edits to `.env`. Inside a container no `.env` is present, so injected variables apply as normal.
 
