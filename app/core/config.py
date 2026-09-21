@@ -286,6 +286,19 @@ class Settings(BaseSettings):
 
     # ---------------------------------------------------------------- Paths --
     data_dir: str = Field(default="data", validation_alias=AliasChoices("DATA_DIR"))
+    graph_bootstrap: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("GRAPH_BOOTSTRAP"),
+        description="On startup, load GRAPH_BOOTSTRAP_FILE into Neo4j when the "
+                    "graph is empty. Makes a fresh clone work without a manual "
+                    "step. Never overwrites: it runs only at zero entities.",
+    )
+    graph_bootstrap_file: str = Field(
+        default="emirates_nbd_graph.cypher",
+        validation_alias=AliasChoices("GRAPH_BOOTSTRAP_FILE"),
+        description="Cypher file used by the startup bootstrap.",
+    )
+
     docs_dir: str = Field(
         default="Company Docs",
         validation_alias=AliasChoices("DOCS_DIR"),

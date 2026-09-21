@@ -710,6 +710,7 @@ async def lifespan(app: FastAPI):
         if store.verify():
             store.init_schema()
             logger.info("  Graph     : connected, schema ready")
+            _bootstrap_graph(store)
         else:
             logger.warning("  Graph     : UNREACHABLE (vector-only mode)")
     except Exception as exc:
@@ -719,6 +720,55 @@ async def lifespan(app: FastAPI):
 
     logger.info("Shutting down; closing Neo4j driver")
     get_graph_store().close()
+
+
+
+def _bootstrap_graph(store: GraphStore) -> None:
+    """Load the bundled Cypher file when the graph is empty.
+
+    Why this exists: the knowledge graph lives in Neo4j, not in the repository,
+    so a fresh clone points at an empty database and the graph half of the
+    system silently does nothing. Loading the bundled file on first start makes
+    `docker compose up` and a clean checkout work end to end.
+
+    Three guards, because writing to a database on startup should never be a
+    surprise:
+
+    * it runs only when the graph reports **zero** entities, so an existing
+      graph is never touched;
+    * it runs only when the configured file actually exists;
+    * it can be disabled outright with ``GRAPH_BOOTSTRAP=false``.
+
+    Failure is logged and swallowed. A bootstrap problem must not stop the API
+    from starting -- vector retrieval still works without a graph.
+    """
+    if not settings.graph_bootstrap:
+        return
+
+    try:
+        if store.stats().get("nodes", 0) > 0:
+            return  # a graph already exists; leave it alone
+    except Exception as exc:
+        logger.debug("Could not read graph stats for bootstrap: %s", exc)
+        return
+
+    path = settings.resolve(settings.graph_bootstrap_file)
+    if not path.exists():
+        logger.info("  Graph     : empty, and no %s to bootstrap from", path.name)
+        return
+
+    try:
+        from app.storage.cypher_loader import load_cypher_file
+
+        logger.info("  Graph     : empty -- bootstrapping from %s", path.name)
+        result = load_cypher_file(store, path)
+        stats = store.stats()
+        logger.info(
+            "  Graph     : loaded %d entities, %d relationships (%d statements, %d failed)",
+            stats["nodes"], stats["relationships"], result["succeeded"], result["failed"],
+        )
+    except Exception as exc:
+        logger.warning("  Graph     : bootstrap failed (%s); continuing", exc)
 
 
 app = FastAPI(

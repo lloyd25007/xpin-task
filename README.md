@@ -93,7 +93,7 @@ resolve its triples back to passages.
 - **Hierarchical parent–child chunking.** ~200-token children are embedded for precise matching; the ~1000-token parent they were split from is what reaches the LLM. Children are cut *from* parent text, so the link is exact rather than heuristic.
 - **Hybrid retrieval with an intent router.** A LangGraph node classifies each question as `vector`, `graph`, or `hybrid` and returns a *list of node names* — LangGraph turns that into a parallel fan-out, so hybrid runs both arms concurrently.
 - **Reciprocal Rank Fusion + cross-encoder reranking**, applied only on the hybrid path, where two incomparable rankings (cosine similarity vs. hop distance) actually need merging.
-- **Graph can be built without an LLM.** `scripts/load_cypher.py` loads a hand-authored `.cypher` file and projects the `:Entity` label onto it, so the graph works with zero LLM calls at ingestion time.
+- **Graph can be built without an LLM, automatically.** A hand-authored `.cypher` file is loaded into Neo4j on first startup whenever the graph is empty, and the `:Entity` label is projected onto it so retrieval can traverse it. A fresh clone therefore has a working graph with zero LLM calls and no manual step.
 - **Cross-provider LLM failover.** Requesty → OpenRouter → OpenAI, whichever have keys. Survives `402 Payment Required` and `429 rate limit` at the provider level, which per-provider model fallback cannot.
 - **Idempotent ingestion.** Chunk ids are content-addressed and FAISS duplicates are deleted before re-adding, so re-running updates in place instead of duplicating or erroring.
 - **Page-linked citations.** Markers render inline as `1 p.12` and link into the source PDF at `#page=12`.
@@ -132,7 +132,8 @@ An API key for **at least one** of: Requesty, OpenRouter, or OpenAI. Embeddings 
 │   │   └── pipeline.py        #   Stage orchestration + progress reporting
 │   ├── storage/               # Persistence
 │   │   ├── vector_store.py    #   FAISS over children + JSON parent store
-│   │   └── graph_store.py     #   Neo4j writes, traversal, subgraph queries
+│   │   ├── graph_store.py     #   Neo4j writes, traversal, subgraph queries
+│   │   └── cypher_loader.py   #   Loads a .cypher file; shared by CLI and startup
 │   ├── retrieval/             # Finding the right context
 │   │   └── retriever.py       #   Intent router, graph traversal, RRF + reranking
 │   ├── chat/                  # Producing the answer
@@ -198,20 +199,22 @@ docker compose --profile local-db up -d neo4j
 
 Then set `NEO4J_URI=bolt://localhost:7687` in `.env`.
 
-### 4. Load the knowledge graph
+### 4. Load the knowledge graph — optional
 
-Fast path, no LLM calls:
+The app loads `emirates_nbd_graph.cypher` into Neo4j automatically on first
+startup, whenever it finds the graph empty. Skip to step 5 unless you want to
+run it by hand.
+
+To load it explicitly, preview the parse, or reset and reload:
 
 ```bash
 python scripts/load_cypher.py emirates_nbd_graph.cypher
-```
-
-Preview without writing, or reset first:
-
-```bash
 python scripts/load_cypher.py emirates_nbd_graph.cypher --dry-run
 python scripts/load_cypher.py emirates_nbd_graph.cypher --wipe
 ```
+
+The automatic load only ever runs at zero entities, so it cannot overwrite an
+existing graph. Disable it with `GRAPH_BOOTSTRAP=false`.
 
 ### 5. Ingest the PDF (builds the vector index)
 
@@ -232,7 +235,7 @@ python scripts/ingest_cli.py --path Company/other.pdf --doc-id other
 ### 6. Run
 
 ```bash
-uvicorn app.api:app --port 8000
+uvicorn app.api.main:app --port 8000
 ```
 
 Open **http://localhost:8000**. API docs are at `/docs`.
@@ -275,7 +278,10 @@ docker compose --profile app up -d --build
 | `RRF_VECTOR_WEIGHT` / `RRF_GRAPH_WEIGHT` | Retriever influence | `1.0` / `0.8` |
 | `EXTRACTION_WORKERS` | Concurrent extraction calls | `8` |
 | `EXTRACTION_RPM` | Request pacing; `0` disables | `30` |
-| `DEFAULT_PDF_PATH` | Document ingested by default | `Company/strategic_report_2025_emirates_nbd.pdf` |
+| `DOCS_DIR` | Source-document directory; also the allow-list for citation PDF links | `Company Docs` |
+| `DEFAULT_PDF_PATH` | Document ingested by default | `Company Docs/strategic_report_2025_emirates_nbd.pdf` |
+| `GRAPH_BOOTSTRAP` | Load the bundled `.cypher` on startup when the graph is empty | `true` |
+| `GRAPH_BOOTSTRAP_FILE` | File used by that bootstrap | `emirates_nbd_graph.cypher` |
 
 > `.env` takes precedence over OS environment variables. This is deliberate: `docker compose` exports these names into the shell, which otherwise silently shadows edits to `.env`. Inside a container no `.env` is present, so injected variables apply as normal.
 

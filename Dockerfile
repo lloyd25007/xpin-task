@@ -45,6 +45,11 @@ COPY --chown=appuser:appuser app/ ./app/
 COPY --chown=appuser:appuser web/ ./web/
 COPY --chown=appuser:appuser scripts/ ./scripts/
 
+# The hand-authored knowledge graph. Without it, `scripts/load_cypher.py` has
+# nothing to load inside the container, and the graph can only be built by
+# spending LLM calls on extraction.
+COPY --chown=appuser:appuser *.cypher ./
+
 USER appuser
 
 # Documentation only; compose publishes the ports it actually needs.
